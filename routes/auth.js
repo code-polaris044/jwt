@@ -3,9 +3,10 @@ const router = express.Router();
 import { User } from "../db/User.js";
 import { body, validationResult } from "express-validator";
 import bcrypt from "bcrypt";
+import jwt from "jsonwebtoken";
 
 router.get("/", (req, res) => {
-  res.send("hell router");
+  res.send("hello router");
 });
 
 // ユーザー新規登録のAPI
@@ -26,7 +27,7 @@ router.post(
     if (user) {
       return res.status(400).json([
         {
-          massage: "すでにそのユーザーは存在しています。",
+          message: "すでにそのユーザーは存在しています。",
         },
       ]);
     }
@@ -38,8 +39,59 @@ router.post(
       email,
       password: hashedPassword,
     });
+
+    // Tokenを作成して送信
+    const token = await jwt.sign(
+      {
+        email,
+      },
+      "SECRET_KEY",
+      {
+        expiresIn: "24h",
+      }
+    );
+
+    return res.json({
+      token: token,
+    });
   }
 );
+
+router.post("/login", async (req, res) => {
+  const { email, password } = req.body;
+  const user = User.find((user) => user.email === email);
+  if (!user) {
+    return res.status(400).json([
+      {
+        message: "そのユーザーは存在しません",
+      },
+    ]);
+  }
+
+  const isMatch = await bcrypt.compare(password, user.password);
+  if (!isMatch) {
+    return res.status(400).json([
+      {
+        message: "パスワードが異なります",
+      },
+    ]);
+  }
+
+  // Tokenを作成して送信
+  const token = await jwt.sign(
+    {
+      email,
+    },
+    "SECRET_KEY",
+    {
+      expiresIn: "24h",
+    }
+  );
+
+  return res.json({
+    token: token,
+  });
+});
 
 router.get("/allUsers", (req, res) => {
   return res.json(User);
