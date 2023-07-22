@@ -15,7 +15,7 @@ app.get("/", (req, res) => {
   res.send("Hello express");
 });
 
-app.get("/auth", (req, res) => {
+app.get("/users", (req, res) => {
   pool.query("SELECT * FROM users", (error, results) => {
     if (error) throw error;
     return res.status(200).json(results.rows);

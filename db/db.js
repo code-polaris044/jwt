@@ -1,13 +1,20 @@
 // db.js
-import pkg from "pg";
-const { Pool } = pkg; // ここでpgモジュールからPoolを取り出す
+import pg from "pg";
 
-const pool = new Pool({
-  user: "postgres",
+const pool = new pg.Pool({
+  user: "sugawara",
   host: "localhost",
   database: "users",
   password: "shunya916",
   port: 5432,
 });
 
-export default pool; // デフォルトエクスポートとしてpoolを提供する
+pool.connect((err, client, done) => {
+  if (err) {
+    console.error("接続エラー：", err);
+  } else {
+    console.log("接続しました！");
+  }
+});
+
+export default pool;

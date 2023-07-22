@@ -1,9 +1,11 @@
+// auth.js
+
 import express from "express";
 const router = express.Router();
-import { User } from "../db/User.js";
 import { body, validationResult } from "express-validator";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
+import pool from "../db/db.js"; // db.jsからpoolをimport
 
 router.get("/", (req, res) => {
   res.send("hello router");
@@ -23,78 +25,52 @@ router.post(
       return res.status(400).json({ errors: errors.array() });
     }
 
-    const user = User.find((user) => user.email === email);
-    if (user) {
-      return res.status(400).json([
+    try {
+      const userResult = await pool.query(
+        "SELECT * FROM users WHERE email = $1",
+        [email]
+      );
+      const user = userResult.rows[0];
+      if (user) {
+        return res.status(400).json([
+          {
+            message: "すでにそのユーザーは存在しています。",
+          },
+        ]);
+      }
+
+      let hashedPassword = await bcrypt.hash(password, 10);
+
+      const insertResult = await pool.query(
+        "INSERT INTO users (email, password) VALUES ($1, $2) RETURNING *",
+        [email, hashedPassword]
+      );
+      const newUser = insertResult.rows[0];
+
+      const token = await jwt.sign(
         {
-          message: "すでにそのユーザーは存在しています。",
+          email: newUser.email,
+        },
+        "SECRET_KEY",
+        {
+          expiresIn: "24h",
+        }
+      );
+
+      return res.json({
+        token: token,
+      });
+    } catch (error) {
+      console.error("Error while registering user:", error);
+      return res.status(500).json([
+        {
+          message: "ユーザーの登録に失敗しました。",
         },
       ]);
     }
-
-    let hashedPassword = await bcrypt.hash(password, 10);
-    // console.log(hashedPassword);
-
-    User.push({
-      email,
-      password: hashedPassword,
-    });
-
-    // Tokenを作成して送信
-    const token = await jwt.sign(
-      {
-        email,
-      },
-      "SECRET_KEY",
-      {
-        expiresIn: "24h",
-      }
-    );
-
-    return res.json({
-      token: token,
-    });
   }
 );
 
-router.post("/login", async (req, res) => {
-  const { email, password } = req.body;
-  const user = User.find((user) => user.email === email);
-  if (!user) {
-    return res.status(400).json([
-      {
-        message: "そのユーザーは存在しません",
-      },
-    ]);
-  }
-
-  const isMatch = await bcrypt.compare(password, user.password);
-  if (!isMatch) {
-    return res.status(400).json([
-      {
-        message: "パスワードが異なります",
-      },
-    ]);
-  }
-
-  // Tokenを作成して送信
-  const token = await jwt.sign(
-    {
-      email,
-    },
-    "SECRET_KEY",
-    {
-      expiresIn: "24h",
-    }
-  );
-
-  return res.json({
-    token: token,
-  });
-});
-
-router.get("/allUsers", (req, res) => {
-  return res.json(User);
-});
+// ... その他のルーターの定義
 
 export default router;
